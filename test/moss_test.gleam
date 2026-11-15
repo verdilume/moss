@@ -28,6 +28,14 @@ pub fn foreground_test() {
       #(moss.Magenta, "\u{001b}[35mcolor\u{001b}[0m"),
       #(moss.Cyan, "\u{001b}[36mcolor\u{001b}[0m"),
       #(moss.White, "\u{001b}[37mcolor\u{001b}[0m"),
+      #(moss.BrightBlack, "\u{001b}[90mcolor\u{001b}[0m"),
+      #(moss.BrightRed, "\u{001b}[91mcolor\u{001b}[0m"),
+      #(moss.BrightGreen, "\u{001b}[92mcolor\u{001b}[0m"),
+      #(moss.BrightYellow, "\u{001b}[93mcolor\u{001b}[0m"),
+      #(moss.BrightBlue, "\u{001b}[94mcolor\u{001b}[0m"),
+      #(moss.BrightMagenta, "\u{001b}[95mcolor\u{001b}[0m"),
+      #(moss.BrightCyan, "\u{001b}[96mcolor\u{001b}[0m"),
+      #(moss.BrightWhite, "\u{001b}[97mcolor\u{001b}[0m"),
     ],
     fn(example) {
       let #(color, expected) = example
@@ -50,6 +58,14 @@ pub fn background_test() {
       #(moss.Magenta, "\u{001b}[45mcolor\u{001b}[0m"),
       #(moss.Cyan, "\u{001b}[46mcolor\u{001b}[0m"),
       #(moss.White, "\u{001b}[47mcolor\u{001b}[0m"),
+      #(moss.BrightBlack, "\u{001b}[100mcolor\u{001b}[0m"),
+      #(moss.BrightRed, "\u{001b}[101mcolor\u{001b}[0m"),
+      #(moss.BrightGreen, "\u{001b}[102mcolor\u{001b}[0m"),
+      #(moss.BrightYellow, "\u{001b}[103mcolor\u{001b}[0m"),
+      #(moss.BrightBlue, "\u{001b}[104mcolor\u{001b}[0m"),
+      #(moss.BrightMagenta, "\u{001b}[105mcolor\u{001b}[0m"),
+      #(moss.BrightCyan, "\u{001b}[106mcolor\u{001b}[0m"),
+      #(moss.BrightWhite, "\u{001b}[107mcolor\u{001b}[0m"),
     ],
     fn(example) {
       let #(color, expected) = example

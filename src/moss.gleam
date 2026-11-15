@@ -15,6 +15,14 @@ pub type Color {
   Magenta
   Cyan
   White
+  BrightBlack
+  BrightRed
+  BrightGreen
+  BrightYellow
+  BrightBlue
+  BrightMagenta
+  BrightCyan
+  BrightWhite
   Color(red: Int, green: Int, blue: Int)
 }
 
@@ -111,6 +119,14 @@ fn color_to_code(color: Color, is_fg: Bool) -> String {
     Magenta -> int.to_string(35 + offset)
     Cyan -> int.to_string(36 + offset)
     White -> int.to_string(37 + offset)
+    BrightBlack -> int.to_string(90 + offset)
+    BrightRed -> int.to_string(91 + offset)
+    BrightGreen -> int.to_string(92 + offset)
+    BrightYellow -> int.to_string(93 + offset)
+    BrightBlue -> int.to_string(94 + offset)
+    BrightMagenta -> int.to_string(95 + offset)
+    BrightCyan -> int.to_string(96 + offset)
+    BrightWhite -> int.to_string(97 + offset)
     Color(red, green, blue) ->
       string.join(
         [
