@@ -36,6 +36,8 @@ Malformed input returns `Error(moss.InvalidHex)`.
 Use `moss/block` to render a rectangular block of plain text. Padding specifies
 top and bottom rows and left and right columns. Negative padding becomes zero.
 
+Run `gleam run -m example` to preview the padding and rounded border in a terminal.
+
 ```gleam
 import moss
 import moss/block
