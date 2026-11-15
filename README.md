@@ -15,7 +15,9 @@ pub fn warning_label() -> String {
 ```
 
 `new()` starts with no colors or attributes. Use `foreground` and `background`
-to set colors, and `bold`, `italic`, and `underline` to enable attributes.
+to set colors. Enable attributes with `bold`, `faint`, `italic`, `underline`,
+`reverse`, or `strikethrough`.
+
 `Color` includes the eight basic ANSI colors from `Black` through `White` and
 their bright variants from `BrightBlack` through `BrightWhite`. All 16 follow
 the terminal's palette. Use `moss.Indexed(201)` for an ANSI-256 palette entry

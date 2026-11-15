@@ -84,6 +84,13 @@ pub fn bold_test() {
   |> should.equal("\u{001b}[1mbold\u{001b}[0m")
 }
 
+pub fn faint_test() {
+  moss.new()
+  |> moss.faint
+  |> moss.render("faint")
+  |> should.equal("\u{001b}[2mfaint\u{001b}[0m")
+}
+
 pub fn italic_test() {
   moss.new()
   |> moss.italic
@@ -98,6 +105,20 @@ pub fn underline_test() {
   |> should.equal("\u{001b}[4munderline\u{001b}[0m")
 }
 
+pub fn reverse_test() {
+  moss.new()
+  |> moss.reverse
+  |> moss.render("reverse")
+  |> should.equal("\u{001b}[7mreverse\u{001b}[0m")
+}
+
+pub fn strikethrough_test() {
+  moss.new()
+  |> moss.strikethrough
+  |> moss.render("strikethrough")
+  |> should.equal("\u{001b}[9mstrikethrough\u{001b}[0m")
+}
+
 pub fn combined_style_test() {
   moss.new()
   |> moss.foreground(moss.Green)
@@ -110,17 +131,18 @@ pub fn combined_style_test() {
 }
 
 pub fn adjacent_runs_test() {
-  let first = moss.new() |> moss.foreground(moss.Red) |> moss.bold
-  let second = moss.new() |> moss.bold |> moss.foreground(moss.Red)
+  let first = moss.new() |> moss.foreground(moss.Red) |> moss.faint
+  let second = moss.new() |> moss.faint |> moss.foreground(moss.Red)
   assert first == second
 
   let styled = moss.render(first, "ab")
   let plain = moss.render(moss.new(), "cd")
-  let other = moss.render(moss.new() |> moss.foreground(moss.Blue), "ef")
+  let other =
+    moss.render(moss.new() |> moss.reverse |> moss.strikethrough, "ef")
 
   should.equal(
     styled <> plain <> other,
-    "\u{001b}[1;31mab\u{001b}[0mcd\u{001b}[34mef\u{001b}[0m",
+    "\u{001b}[2;31mab\u{001b}[0mcd\u{001b}[7;9mef\u{001b}[0m",
   )
 }
 

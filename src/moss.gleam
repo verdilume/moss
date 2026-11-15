@@ -38,14 +38,26 @@ pub opaque type Style {
     foreground: Option(Color),
     background: Option(Color),
     bold: Bool,
+    faint: Bool,
     italic: Bool,
     underline: Bool,
+    reverse: Bool,
+    strikethrough: Bool,
   )
 }
 
 /// Create a style with no colors or attributes enabled.
 pub fn new() -> Style {
-  Style(None, None, False, False, False)
+  Style(
+    foreground: None,
+    background: None,
+    bold: False,
+    faint: False,
+    italic: False,
+    underline: False,
+    reverse: False,
+    strikethrough: False,
+  )
 }
 
 /// Set the text color.
@@ -63,6 +75,11 @@ pub fn bold(style: Style) -> Style {
   Style(..style, bold: True)
 }
 
+/// Enable faint text.
+pub fn faint(style: Style) -> Style {
+  Style(..style, faint: True)
+}
+
 /// Enable italic text.
 pub fn italic(style: Style) -> Style {
   Style(..style, italic: True)
@@ -71,6 +88,16 @@ pub fn italic(style: Style) -> Style {
 /// Enable underlined text.
 pub fn underline(style: Style) -> Style {
   Style(..style, underline: True)
+}
+
+/// Enable reverse video, swapping the displayed foreground and background.
+pub fn reverse(style: Style) -> Style {
+  Style(..style, reverse: True)
+}
+
+/// Enable strikethrough text.
+pub fn strikethrough(style: Style) -> Style {
+  Style(..style, strikethrough: True)
 }
 
 /// Wrap styled text in ANSI SGR codes and a trailing reset.
@@ -85,7 +112,14 @@ pub fn render(style: Style, text: String) -> String {
 
 fn build_codes(style: Style) -> List(String) {
   let attrs =
-    [#(style.bold, "1"), #(style.italic, "3"), #(style.underline, "4")]
+    [
+      #(style.bold, "1"),
+      #(style.faint, "2"),
+      #(style.italic, "3"),
+      #(style.underline, "4"),
+      #(style.reverse, "7"),
+      #(style.strikethrough, "9"),
+    ]
     |> list.filter_map(fn(item) {
       case item.0 {
         True -> Ok(item.1)
