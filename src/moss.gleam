@@ -65,9 +65,19 @@ pub fn foreground(style: Style, color: Color) -> Style {
   Style(..style, foreground: Some(color))
 }
 
+/// Clear the text color.
+pub fn unset_foreground(style: Style) -> Style {
+  Style(..style, foreground: None)
+}
+
 /// Set the background color.
 pub fn background(style: Style, color: Color) -> Style {
   Style(..style, background: Some(color))
+}
+
+/// Clear the background color.
+pub fn unset_background(style: Style) -> Style {
+  Style(..style, background: None)
 }
 
 /// Enable bold text.
@@ -75,9 +85,19 @@ pub fn bold(style: Style) -> Style {
   Style(..style, bold: True)
 }
 
+/// Disable bold text.
+pub fn unset_bold(style: Style) -> Style {
+  Style(..style, bold: False)
+}
+
 /// Enable faint text.
 pub fn faint(style: Style) -> Style {
   Style(..style, faint: True)
+}
+
+/// Disable faint text.
+pub fn unset_faint(style: Style) -> Style {
+  Style(..style, faint: False)
 }
 
 /// Enable italic text.
@@ -85,9 +105,19 @@ pub fn italic(style: Style) -> Style {
   Style(..style, italic: True)
 }
 
+/// Disable italic text.
+pub fn unset_italic(style: Style) -> Style {
+  Style(..style, italic: False)
+}
+
 /// Enable underlined text.
 pub fn underline(style: Style) -> Style {
   Style(..style, underline: True)
+}
+
+/// Disable underlined text.
+pub fn unset_underline(style: Style) -> Style {
+  Style(..style, underline: False)
 }
 
 /// Enable reverse video, swapping the displayed foreground and background.
@@ -95,9 +125,19 @@ pub fn reverse(style: Style) -> Style {
   Style(..style, reverse: True)
 }
 
+/// Disable reverse video.
+pub fn unset_reverse(style: Style) -> Style {
+  Style(..style, reverse: False)
+}
+
 /// Enable strikethrough text.
 pub fn strikethrough(style: Style) -> Style {
   Style(..style, strikethrough: True)
+}
+
+/// Disable strikethrough text.
+pub fn unset_strikethrough(style: Style) -> Style {
+  Style(..style, strikethrough: False)
 }
 
 /// Wrap styled text in ANSI SGR codes and a trailing reset.

@@ -130,6 +130,43 @@ pub fn combined_style_test() {
   |> should.equal("\u{001b}[1;3;4;32;44mSprig\u{001b}[0m")
 }
 
+pub fn unset_properties_test() {
+  let style =
+    moss.new()
+    |> moss.foreground(moss.Green)
+    |> moss.background(moss.Blue)
+    |> moss.bold
+    |> moss.faint
+    |> moss.italic
+    |> moss.underline
+    |> moss.reverse
+    |> moss.strikethrough
+
+  let examples = [
+    #(moss.unset_foreground, "\u{001b}[1;2;3;4;7;9;44mtext\u{001b}[0m"),
+    #(moss.unset_background, "\u{001b}[1;2;3;4;7;9;32mtext\u{001b}[0m"),
+    #(moss.unset_bold, "\u{001b}[2;3;4;7;9;32;44mtext\u{001b}[0m"),
+    #(moss.unset_faint, "\u{001b}[1;3;4;7;9;32;44mtext\u{001b}[0m"),
+    #(moss.unset_italic, "\u{001b}[1;2;4;7;9;32;44mtext\u{001b}[0m"),
+    #(moss.unset_underline, "\u{001b}[1;2;3;7;9;32;44mtext\u{001b}[0m"),
+    #(moss.unset_reverse, "\u{001b}[1;2;3;4;9;32;44mtext\u{001b}[0m"),
+    #(moss.unset_strikethrough, "\u{001b}[1;2;3;4;7;32;44mtext\u{001b}[0m"),
+  ]
+
+  list.each(examples, fn(example) {
+    let #(unset, expected) = example
+    unset(style) |> moss.render("text") |> should.equal(expected)
+  })
+
+  let cleared =
+    list.fold(examples, style, fn(style, example) {
+      let #(unset, _) = example
+      unset(style)
+    })
+  assert cleared == moss.new()
+  assert moss.render(cleared, "text") == "text"
+}
+
 pub fn adjacent_runs_test() {
   let first = moss.new() |> moss.foreground(moss.Red) |> moss.faint
   let second = moss.new() |> moss.faint |> moss.foreground(moss.Red)

@@ -18,6 +18,11 @@ pub fn warning_label() -> String {
 to set colors. Enable attributes with `bold`, `faint`, `italic`, `underline`,
 `reverse`, or `strikethrough`.
 
+Each property has a matching `unset_*` function. For example, piping a style
+through `moss.unset_bold` removes bold and preserves its colors and other
+attributes. Use `moss.unset_foreground` or `moss.unset_background` to clear a
+color. Clearing every property gives a style equal to `moss.new()`.
+
 `Color` includes the eight basic ANSI colors from `Black` through `White` and
 their bright variants from `BrightBlack` through `BrightWhite`. All 16 follow
 the terminal's palette. Use `moss.Indexed(201)` for an ANSI-256 palette entry
