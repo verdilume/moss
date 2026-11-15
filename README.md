@@ -31,6 +31,28 @@ channels are clamped to 0–255 when rendered. `moss.hex` parses six hex digits
 with an optional leading `#` and returns `Result(Color, ColorError)`.
 Malformed input returns `Error(moss.InvalidHex)`.
 
+## Standalone blocks
+
+Use `moss/block` to render a rectangular block of plain text. Padding specifies
+top and bottom rows and left and right columns. Negative padding becomes zero.
+
+```gleam
+import moss
+import moss/block
+
+pub fn panel() -> String {
+  block.new()
+  |> block.padding(top: 1, right: 2, bottom: 1, left: 2)
+  |> block.style(moss.new() |> moss.foreground(moss.Cyan))
+  |> block.render("Hello!\n界")
+}
+```
+
+Shorter lines are filled on the right based on their terminal cell width.
+A trailing newline contributes an empty row. Tabs expand to eight-column
+stops relative to the content. The interior style applies to the content
+and its padding, one row at a time.
+
 ## Rendering at redraw time
 
 Store text and `moss.Style` separately in each cell. At redraw time, compare
@@ -42,8 +64,8 @@ defaults.
 `render` returns plain text unchanged for an empty style. For a styled run it
 adds one opening ANSI SGR sequence and a trailing `ESC[0m` reset. Pass plain
 text spans. Embedded ANSI is passed through, so an embedded reset clears the
-active terminal style for the rest of the span. The caller owns terminal I/O,
-cursor movement, screen state, input, layout, and Unicode display widths.
+active terminal style for the rest of the span. In a cell-based redraw, the
+caller owns terminal I/O, cursor movement, screen state, input, and layout.
 
 ## Development
 
