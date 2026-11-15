@@ -124,6 +124,23 @@ pub fn adjacent_runs_test() {
   )
 }
 
+pub fn indexed_colors_test() {
+  moss.new()
+  |> moss.foreground(moss.Indexed(201))
+  |> moss.background(moss.Indexed(17))
+  |> moss.bold
+  |> moss.render("indexed")
+  |> should.equal("\u{001b}[1;38;5;201;48;5;17mindexed\u{001b}[0m")
+}
+
+pub fn indexed_color_bounds_test() {
+  moss.new()
+  |> moss.foreground(moss.Indexed(-1))
+  |> moss.background(moss.Indexed(256))
+  |> moss.render("clamped")
+  |> should.equal("\u{001b}[38;5;0;48;5;255mclamped\u{001b}[0m")
+}
+
 pub fn rgb_foreground_test() {
   moss.new()
   |> moss.foreground(moss.Color(255, 123, 19))

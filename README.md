@@ -18,10 +18,11 @@ pub fn warning_label() -> String {
 to set colors, and `bold`, `italic`, and `underline` to enable attributes.
 `Color` includes the eight basic ANSI colors from `Black` through `White` and
 their bright variants from `BrightBlack` through `BrightWhite`. All 16 follow
-the terminal's palette. Use `moss.Color(red: 136, green: 192, blue: 112)` for
-true color. RGB channels are clamped to 0–255 when rendered. `moss.hex`
-parses six hex digits with an optional leading `#` and returns a
-`Result(Color, ColorError)`. Malformed input returns `Error(moss.InvalidHex)`.
+the terminal's palette. Use `moss.Indexed(201)` for an ANSI-256 palette entry
+or `moss.Color(red: 136, green: 192, blue: 112)` for true color. Indices and RGB
+channels are clamped to 0–255 when rendered. `moss.hex` parses six hex digits
+with an optional leading `#` and returns `Result(Color, ColorError)`.
+Malformed input returns `Error(moss.InvalidHex)`.
 
 ## Rendering at redraw time
 

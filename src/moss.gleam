@@ -5,7 +5,8 @@ import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleam_community/colour
 
-/// Named ANSI colors or RGB channels, clamped to 0–255 when rendered.
+/// Named ANSI colors, indexed ANSI-256 colors, or true-color RGB.
+/// Indices and RGB channels are clamped to 0–255 when rendered.
 pub type Color {
   Black
   Red
@@ -23,6 +24,7 @@ pub type Color {
   BrightMagenta
   BrightCyan
   BrightWhite
+  Indexed(index: Int)
   Color(red: Int, green: Int, blue: Int)
 }
 
@@ -127,6 +129,10 @@ fn color_to_code(color: Color, is_fg: Bool) -> String {
     BrightMagenta -> int.to_string(95 + offset)
     BrightCyan -> int.to_string(96 + offset)
     BrightWhite -> int.to_string(97 + offset)
+    Indexed(index) ->
+      int.to_string(38 + offset)
+      <> ";5;"
+      <> int.to_string(int.clamp(index, 0, 255))
     Color(red, green, blue) ->
       string.join(
         [
