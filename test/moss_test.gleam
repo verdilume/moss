@@ -167,6 +167,33 @@ pub fn unset_properties_test() {
   assert moss.render(cleared, "text") == "text"
 }
 
+pub fn hyperlink_test() {
+  let linked = moss.new() |> moss.hyperlink("https://example.com")
+  let open = "\u{001b}]8;;https://example.com\u{001b}\\"
+  let close = "\u{001b}]8;;\u{001b}\\"
+
+  moss.render(linked, "link") |> should.equal(open <> "link" <> close)
+  linked
+  |> moss.bold
+  |> moss.render("link")
+  |> should.equal(open <> "\u{001b}[1mlink\u{001b}[0m" <> close)
+
+  let cleared = moss.unset_hyperlink(linked)
+  assert cleared == moss.new()
+}
+
+pub fn invalid_hyperlink_test() {
+  let style = moss.new() |> moss.bold
+  let linked = moss.hyperlink(style, "https://example.com")
+
+  list.each(
+    ["", "https://example.com\u{0007}", "https://example.com\u{009c}"],
+    fn(url) {
+      assert moss.hyperlink(linked, url) == style
+    },
+  )
+}
+
 pub fn adjacent_runs_test() {
   let first = moss.new() |> moss.foreground(moss.Red) |> moss.faint
   let second = moss.new() |> moss.faint |> moss.foreground(moss.Red)

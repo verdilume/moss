@@ -43,6 +43,7 @@ pub opaque type Style {
     underline: Bool,
     reverse: Bool,
     strikethrough: Bool,
+    hyperlink: Option(String),
   )
 }
 
@@ -57,6 +58,7 @@ pub fn new() -> Style {
     underline: False,
     reverse: False,
     strikethrough: False,
+    hyperlink: None,
   )
 }
 
@@ -140,13 +142,44 @@ pub fn unset_strikethrough(style: Style) -> Style {
   Style(..style, strikethrough: False)
 }
 
-/// Wrap styled text in ANSI SGR codes and a trailing reset.
+/// Set the URL for a terminal hyperlink. Empty URLs and URLs containing
+/// control characters clear the link.
+pub fn hyperlink(style: Style, url: String) -> Style {
+  let has_control =
+    string.to_utf_codepoints(url)
+    |> list.any(fn(point) {
+      let code = string.utf_codepoint_to_int(point)
+      code < 0x20 || { code >= 0x7f && code <= 0x9f }
+    })
+
+  case url == "" || has_control {
+    True -> unset_hyperlink(style)
+    False -> Style(..style, hyperlink: Some(url))
+  }
+}
+
+/// Clear the terminal hyperlink.
+pub fn unset_hyperlink(style: Style) -> Style {
+  Style(..style, hyperlink: None)
+}
+
+/// Wrap text in the ANSI codes for its style and hyperlink.
 /// An unstyled value returns the original text unchanged.
 pub fn render(style: Style, text: String) -> String {
   let codes = build_codes(style)
-  case codes {
+  let styled = case codes {
     [] -> text
     _ -> "\u{001b}[" <> string.join(codes, ";") <> "m" <> text <> "\u{001b}[0m"
+  }
+
+  case style.hyperlink {
+    Some(url) ->
+      "\u{001b}]8;;"
+      <> url
+      <> "\u{001b}\\"
+      <> styled
+      <> "\u{001b}]8;;\u{001b}\\"
+    None -> styled
   }
 }
 
