@@ -1,6 +1,6 @@
 # Moss
 
-Moss renders ANSI-styled text spans for Gleam. A style is an immutable value.
+Moss renders ANSI-styled text and boxes for Gleam. A style is an immutable value.
 Each setter returns a new style, so setters compose in a pipeline.
 
 ```gleam
@@ -33,36 +33,38 @@ Malformed input returns `Error(moss.InvalidHex)`.
 
 ## Standalone blocks
 
-Use `moss/block` to render a rectangular block of plain text. Padding specifies
-top and bottom rows and left and right columns. Negative padding becomes zero.
+Set padding or a border on a style to render a rectangular box. Padding
+specifies top and bottom rows and left and right columns. Negative padding
+becomes zero.
 
 Run `gleam run -m example` to preview the padding and rounded border in a terminal.
 
 ```gleam
 import moss
-import moss/block
 
 pub fn panel() -> String {
-  block.new()
-  |> block.padding(top: 1, right: 2, bottom: 1, left: 2)
-  |> block.style(moss.new() |> moss.foreground(moss.Cyan))
-  |> block.rounded_border(moss.new() |> moss.foreground(moss.Blue))
-  |> block.render("Hello!\n界")
+  moss.new()
+  |> moss.padding(top: 1, right: 2, bottom: 1, left: 2)
+  |> moss.foreground(moss.Cyan)
+  |> moss.border_foreground(moss.Blue)
+  |> moss.render("Hello!\n界")
 }
 ```
 
 Shorter lines are filled on the right based on their terminal cell width.
 A trailing newline contributes an empty row. Tabs expand to eight-column
 stops relative to the content. The interior style applies to the content
-and its padding, one row at a time. The rounded border has its own style.
-Pass `moss.new()` for a plain border. Box glyphs occupy one column in the
-default width convention.
+and its padding, one row at a time. Use `border_foreground` to add a colored
+border, or pass a style to `rounded_border` for more control. Pass
+`moss.new()` for a plain border. Box glyphs occupy one column in the default
+width convention.
 
 ## Rendering at redraw time
 
-Store text and `moss.Style` separately in each cell. At redraw time, compare
-frames and group adjacent changed cells on the same row whose styles compare
-equal with `==`. Concatenate each run's text and call `moss.render` once per run.
+Use `moss.span_style` to clear padding and borders before storing a style in a
+cell. At redraw time, compare frames and group adjacent changed cells on the
+same row whose styles compare equal with `==`. Concatenate each run's text and
+call `moss.render` once per run.
 Start drawing in a known default terminal style so plain runs inherit those
 defaults.
 

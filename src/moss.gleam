@@ -4,6 +4,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleam_community/colour
+import string_width
 
 /// Named ANSI colors, indexed ANSI-256 colors, or true-color RGB.
 /// Indices and RGB channels are clamped to 0–255 when rendered.
@@ -44,10 +45,16 @@ pub opaque type Style {
     reverse: Bool,
     strikethrough: Bool,
     hyperlink: Option(String),
+    padding: Option(Padding),
+    border: Option(Style),
   )
 }
 
-/// Create a style with no colors or attributes enabled.
+type Padding {
+  Padding(top: Int, right: Int, bottom: Int, left: Int)
+}
+
+/// Create an empty style for a text span.
 pub fn new() -> Style {
   Style(
     foreground: None,
@@ -59,6 +66,8 @@ pub fn new() -> Style {
     reverse: False,
     strikethrough: False,
     hyperlink: None,
+    padding: None,
+    border: None,
   )
 }
 
@@ -163,9 +172,107 @@ pub fn unset_hyperlink(style: Style) -> Style {
   Style(..style, hyperlink: None)
 }
 
-/// Wrap text in the ANSI codes for its style and hyperlink.
-/// An unstyled value returns the original text unchanged.
+/// Set box padding in terminal rows and columns. Negative values become zero.
+pub fn padding(
+  style: Style,
+  top top: Int,
+  right right: Int,
+  bottom bottom: Int,
+  left left: Int,
+) -> Style {
+  let padding =
+    Padding(
+      top: int.max(top, 0),
+      right: int.max(right, 0),
+      bottom: int.max(bottom, 0),
+      left: int.max(left, 0),
+    )
+  Style(..style, padding: Some(padding))
+}
+
+/// Clear the box padding.
+pub fn unset_padding(style: Style) -> Style {
+  Style(..style, padding: None)
+}
+
+/// Add a rounded border using the given text style for its glyphs.
+/// Pass `moss.new()` for a plain border.
+pub fn rounded_border(style: Style, border: Style) -> Style {
+  Style(..style, border: Some(span_style(border)))
+}
+
+/// Set the border's foreground color, adding a rounded border if needed.
+pub fn border_foreground(style: Style, color: Color) -> Style {
+  let border = option.unwrap(style.border, new())
+  rounded_border(style, foreground(border, color))
+}
+
+/// Remove the border.
+pub fn unset_border(style: Style) -> Style {
+  Style(..style, border: None)
+}
+
+/// Keep the colors, attributes, and hyperlink for a text span or cell.
+pub fn span_style(style: Style) -> Style {
+  Style(..style, padding: None, border: None)
+}
+
+/// Render text as a span or as a box when padding or a border is set.
 pub fn render(style: Style, text: String) -> String {
+  case style.padding, style.border {
+    None, None -> render_span(style, text)
+    _, _ -> render_box(style, text)
+  }
+}
+
+fn render_box(style: Style, text: String) -> String {
+  let padding = option.unwrap(style.padding, Padding(0, 0, 0, 0))
+  let lines =
+    text
+    |> string.replace("\r\n", "\n")
+    |> string_width.tabs_to_spaces
+    |> string.split("\n")
+    |> list.map(fn(line) { #(line, string_width.line(line)) })
+
+  let content_width =
+    list.fold(lines, 0, fn(widest, line) { int.max(widest, line.1) })
+  let width = content_width + padding.left + padding.right
+  let left = string.repeat(" ", padding.left)
+  let blank = string.repeat(" ", width)
+  let content =
+    list.map(lines, fn(line) {
+      let #(text, columns) = line
+      left
+      <> text
+      <> string.repeat(" ", content_width - columns + padding.right)
+    })
+
+  let rows =
+    [
+      list.repeat(blank, padding.top),
+      content,
+      list.repeat(blank, padding.bottom),
+    ]
+    |> list.flatten
+    |> list.map(render_span(style, _))
+
+  let framed = case style.border {
+    None -> rows
+    Some(border) -> {
+      // shortcut: assumes one-column box glyphs, add an ASCII preset for wide glyphs.
+      let edge = string.repeat("─", width)
+      let top = render_span(border, "╭" <> edge <> "╮")
+      let bottom = render_span(border, "╰" <> edge <> "╯")
+      let side = render_span(border, "│")
+      let middle = list.map(rows, fn(row) { side <> row <> side })
+      list.flatten([[top], middle, [bottom]])
+    }
+  }
+
+  string.join(framed, "\n")
+}
+
+fn render_span(style: Style, text: String) -> String {
   let codes = build_codes(style)
   let styled = case codes {
     [] -> text
