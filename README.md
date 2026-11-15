@@ -44,6 +44,7 @@ pub fn panel() -> String {
   block.new()
   |> block.padding(top: 1, right: 2, bottom: 1, left: 2)
   |> block.style(moss.new() |> moss.foreground(moss.Cyan))
+  |> block.rounded_border(moss.new() |> moss.foreground(moss.Blue))
   |> block.render("Hello!\n界")
 }
 ```
@@ -51,7 +52,9 @@ pub fn panel() -> String {
 Shorter lines are filled on the right based on their terminal cell width.
 A trailing newline contributes an empty row. Tabs expand to eight-column
 stops relative to the content. The interior style applies to the content
-and its padding, one row at a time.
+and its padding, one row at a time. The rounded border has its own style.
+Pass `moss.new()` for a plain border. Box glyphs occupy one column in the
+default width convention.
 
 ## Rendering at redraw time
 

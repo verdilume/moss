@@ -1,17 +1,32 @@
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/string
 import moss
 import string_width
 
-/// A standalone text block with its own padding and interior style.
+/// A standalone text block with padding, an interior style, and an optional border.
 pub opaque type Block {
-  Block(top: Int, right: Int, bottom: Int, left: Int, interior: moss.Style)
+  Block(
+    top: Int,
+    right: Int,
+    bottom: Int,
+    left: Int,
+    interior: moss.Style,
+    border: Option(moss.Style),
+  )
 }
 
-/// Create a block with zero padding and an empty style.
+/// Create a block with zero padding, an empty style, and no border.
 pub fn new() -> Block {
-  Block(top: 0, right: 0, bottom: 0, left: 0, interior: moss.new())
+  Block(
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    interior: moss.new(),
+    border: None,
+  )
 }
 
 /// Set the padding in terminal rows and columns. Negative values become zero.
@@ -36,6 +51,11 @@ pub fn style(block: Block, style: moss.Style) -> Block {
   Block(..block, interior: style)
 }
 
+/// Add a rounded border with its own style. Pass `moss.new()` for a plain border.
+pub fn rounded_border(block: Block, style: moss.Style) -> Block {
+  Block(..block, border: Some(style))
+}
+
 /// Render plain text as a rectangular block. Shorter lines are filled on the
 /// right. A trailing newline counts as an empty row, and tabs expand relative
 /// to the start of the content.
@@ -58,12 +78,23 @@ pub fn render(block: Block, text: String) -> String {
       left <> text <> string.repeat(" ", content_width - columns + block.right)
     })
 
-  [
-    list.repeat(blank, block.top),
-    content,
-    list.repeat(blank, block.bottom),
-  ]
-  |> list.flatten
-  |> list.map(moss.render(block.interior, _))
-  |> string.join("\n")
+  let rows =
+    [list.repeat(blank, block.top), content, list.repeat(blank, block.bottom)]
+    |> list.flatten
+    |> list.map(moss.render(block.interior, _))
+
+  let framed = case block.border {
+    None -> rows
+    Some(style) -> {
+      // shortcut: assumes one-column box glyphs, add an ASCII preset for wide glyphs.
+      let edge = string.repeat("─", width)
+      let top = moss.render(style, "╭" <> edge <> "╮")
+      let bottom = moss.render(style, "╰" <> edge <> "╯")
+      let side = moss.render(style, "│")
+      let middle = list.map(rows, fn(row) { side <> row <> side })
+      list.flatten([[top], middle, [bottom]])
+    }
+  }
+
+  string.join(framed, "\n")
 }
