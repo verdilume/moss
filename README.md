@@ -59,6 +59,20 @@ border, or pass a style to `rounded_border` for more control. Pass
 `moss.new()` for a plain border. Box glyphs occupy one column in the default
 width convention.
 
+## Moss layout demo
+
+Run `gleam run -m moss_layout` in a terminal at least 100 columns wide to
+see the full [Moss layout demo](src/moss_layout.gleam), including
+the gradient dialog, color grid, and floating overlay.
+
+Moss handles span styles, padding, and the rounded dialog border. The demo uses
+`string_width` for terminal-cell measurement, wrapping, alignment, joins,
+terminal size, and stripping ANSI when output is redirected. The custom tab
+and list borders, margins, patterned fill, and overlay are assembled in the
+example. The executable uses the dark palette. `moss_layout.render(False, 0)`
+returns the full light-palette render. The gradients blend RGB channels, and
+interactive output uses true color.
+
 ## Rendering at redraw time
 
 Use `moss.span_style` to clear padding and borders before storing a style in a
