@@ -38,5 +38,5 @@ pub fn light_palette_and_narrow_terminal_test() {
   assert string.contains(plain, "Light palette")
   let assert [pattern] =
     plain |> string.split("\n") |> list.drop(11) |> list.take(1)
-  assert pattern == "  " <> string.repeat("青苔", 14)
+  assert pattern == "  " <> string.repeat("青苔", 14) <> " "
 }

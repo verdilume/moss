@@ -16,12 +16,13 @@ pub fn warning_label() -> String {
 
 `new()` starts with no colors or attributes. Use `foreground` and `background`
 to set colors. Enable attributes with `bold`, `faint`, `italic`, `underline`,
-`reverse`, or `strikethrough`.
+`reverse`, `strikethrough`, or `blink`. Use `underline_style` and
+`underline_color` for a terminal that supports extended underlines.
 
-Each property has a matching `unset_*` function. For example, piping a style
-through `moss.unset_bold` removes bold and preserves its colors and other
-attributes. Use `moss.unset_foreground` or `moss.unset_background` to clear a
-color. Clearing every property gives a style equal to `moss.new()`.
+Use the matching `unset_*` functions to clear text effects and colors.
+`moss.inherit(style, fallback)` fills unset properties from a base style and
+keeps the receiving style's padding and margins. Use `moss/ranges` to apply
+styles to grapheme ranges within ANSI-styled text.
 
 `Color` includes the eight basic ANSI colors from `Black` through `White` and
 their bright variants from `BrightBlack` through `BrightWhite`. All 16 follow
@@ -59,23 +60,58 @@ border, or pass a style to `rounded_border` for more control. Pass
 `moss.new()` for a plain border. Box glyphs occupy one column in the default
 width convention.
 
+Set `width` to wrap and align content within a box and `height` to reserve
+rows. Both include padding and borders. Use `margin` for space outside the
+box, and `max_width` or `max_height` to clip the finished output.
+`padding_fill`, `margin_fill`, and `fill` repeat patterns at terminal cell
+boundaries.
+
+Pass a preset or custom `Border` to `moss.border`. Use `border_sides` to
+choose edges, `border_side_foreground` or `border_side_background` to color
+an individual edge, and `border_gradient` to paint a color ramp clockwise
+around the border.
+
+## Compositing and output
+
+Use `moss/compositor` to position rendered strings in a canvas. Coordinates
+are zero-based terminal columns and rows. Layers with higher z-indices draw
+on top. The canvas can clip content, render overlapping styles, and return
+the layer ID at a painted cell.
+
+```gleam
+import moss/compositor
+
+pub fn overlay(page: String, panel: String) -> String {
+  compositor.render([
+    compositor.layer("page", page),
+    compositor.layer("panel", panel)
+    |> compositor.position(x: 4, y: 2),
+  ])
+}
+```
+
+`moss/gradient` generates one- and two-dimensional CIELAB color ramps.
+`moss/terminal.println` adapts ANSI colors to the detected terminal profile
+and prints plain text when redirected. Use `moss/terminal.background_is_dark`
+during startup to choose a palette before another reader takes stdin.
+
+`moss/table`, `moss/list`, and `moss/tree` render styled tables, nested
+lists, and trees with multiline labels.
+
 ## Moss layout demo
 
 Run `gleam run -m moss_layout` in a terminal at least 100 columns wide to
 see the full [Moss layout demo](src/moss_layout.gleam), including
 the gradient dialog, color grid, and floating overlay.
 
-Moss handles span styles, padding, and the rounded dialog border. The demo uses
-`string_width` for terminal-cell measurement, wrapping, alignment, joins,
-terminal size, and stripping ANSI when output is redirected. The custom tab
-and list borders, margins, patterned fill, and overlay are assembled in the
-example. The executable uses the dark palette. `moss_layout.render(False, 0)`
-returns the full light-palette render. The gradients blend RGB channels, and
-interactive output uses true color.
+The demo builds its tabs and lists with custom border sides, colors the
+dialog with a grapheme gradient, and layers the floating panel over the page.
+It detects the terminal background at startup and uses the dark palette as a
+fallback. `moss_layout.render(False, 0)` returns the full light-palette render.
 
 ## Rendering at redraw time
 
-Use `moss.span_style` to clear padding and borders before storing a style in a
+Use `moss.span_style` to clear box settings before storing a style in a
 cell. At redraw time, compare frames and group adjacent changed cells on the
 same row whose styles compare equal with `==`. Concatenate each run's text and
 call `moss.render` once per run.

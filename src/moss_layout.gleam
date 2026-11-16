@@ -1,8 +1,10 @@
-import gleam/int
-import gleam/io
 import gleam/list
 import gleam/string
 import moss
+import moss/compositor
+import moss/gradient
+import moss/ranges
+import moss/terminal
 import string_width.{Size}
 
 const width = 96
@@ -20,21 +22,15 @@ pub fn main() -> Nil {
     Ok(size) -> size.columns
     Error(Nil) -> 0
   }
-  let document = render(True, columns)
-  case string_width.is_tty() {
-    True -> io.println(document)
-    False -> io.println(string_width.strip_ansi(document))
-  }
+  render(terminal.background_is_dark(fallback: True), columns)
+  |> terminal.println
 }
 
 /// Render the Moss layout with the requested palette. Use zero columns
 /// for the full-width document.
 pub fn render(dark_background: Bool, columns: Int) -> String {
   let theme = fn(light, dark) {
-    case dark_background {
-      True -> rgb(dark)
-      False -> rgb(light)
-    }
+    terminal.adaptive(light: rgb(light), dark: rgb(dark), dark_background:)
   }
   let subtle = moss.new() |> moss.foreground(theme("#557A6A", "#3F6253"))
   let highlight = theme("#26775E", mint)
@@ -67,44 +63,57 @@ pub fn render(dark_background: Bool, columns: Int) -> String {
     moss.new()
     |> moss.padding(top: 1, right: 2, bottom: 1, left: 2)
     |> moss.render(document)
-    |> add_modal
 
-  case columns > 0 && columns < width + 4 {
+  let layers = [
+    compositor.layer("page", page),
+    compositor.layer("modal", modal())
+      |> compositor.position(x: modal_x, y: modal_y),
+  ]
+  let size = string_width.dimensions(page)
+  case columns > 0 && columns < size.columns {
     True ->
-      page
-      |> string.split("\n")
-      |> list.map(slice_columns(_, 0, columns))
-      |> string.join("\n")
-    False -> page
+      compositor.render_viewport(layers, width: columns, height: size.rows)
+    False -> compositor.render(layers)
   }
 }
 
 fn tabs(highlight: moss.Color) -> String {
   let edge = moss.new() |> moss.foreground(highlight)
-  let names = ["Moss", "Styles", "Borders", "Colors", "Layers"]
+  let inactive =
+    moss.Border(
+      top: "─",
+      right: "│",
+      bottom: "─",
+      left: "│",
+      top_left: "╭",
+      top_right: "╮",
+      bottom_left: "┴",
+      bottom_right: "┴",
+    )
+  let active =
+    moss.Border(..inactive, bottom: " ", bottom_left: "┘", bottom_right: "└")
   let blocks =
-    list.index_map(names, fn(name, index) {
-      let label = " " <> name <> " "
-      let size = string_width.line(label)
-      let bottom = case index {
-        0 -> "┘" <> string.repeat(" ", size) <> "└"
-        _ -> "┴" <> string.repeat("─", size) <> "┴"
+    ["Moss", "Styles", "Borders", "Colors", "Layers"]
+    |> list.index_map(fn(name, index) {
+      let glyphs = case index {
+        0 -> active
+        _ -> inactive
       }
-      let side = moss.render(edge, "│")
-      string.join(
-        [
-          moss.render(edge, "╭" <> string.repeat("─", size) <> "╮"),
-          side <> label <> side,
-          moss.render(edge, bottom),
-        ],
-        "\n",
-      )
+      moss.new()
+      |> moss.border(glyphs, edge)
+      |> moss.padding(top: 0, right: 1, bottom: 0, left: 1)
+      |> moss.render(name)
     })
   let row =
     string_width.stack_horizontal(blocks, string_width.Top, gap: 0, with: " ")
-  let gap = string.repeat("─", width - 2 - string_width.line(row))
+  let gap =
+    moss.new()
+    |> moss.width(width - 2 - string_width.line(row))
+    |> moss.border(moss.normal_border_glyphs(), edge)
+    |> moss.border_sides(moss.BorderSides(False, False, True, False))
+    |> moss.render("")
   string_width.stack_horizontal(
-    [row, moss.render(edge, gap)],
+    [row, gap],
     string_width.Bottom,
     gap: 0,
     with: " ",
@@ -118,21 +127,24 @@ fn title(subtle: moss.Style, special: moss.Style) -> String {
     |> moss.italic
     |> moss.padding(top: 0, right: 1, bottom: 0, left: 1)
   let logo =
-    blend(5, rgb(mint), rgb("#55AB91"))
+    gradient.blend_1d(5, [rgb(mint), rgb("#55AB91")])
     |> list.index_map(fn(color, index) {
-      string.repeat(" ", index * 2)
-      <> { style |> moss.background(color) |> moss.render("Moss") }
+      style
+      |> moss.background(color)
+      |> moss.margin(top: 0, right: 0, bottom: 0, left: index * 2)
+      |> moss.render("Moss")
     })
     |> string.join("\n")
   let info =
     "Made with Gleam"
     <> moss.render(subtle, " • ")
     <> moss.render(special, "https://github.com/verdilume/moss")
-  let description =
-    "\nStyles and Layouts for Gleam Terminals\n"
-    <> moss.render(subtle, string.repeat("─", string_width.line(info)))
-    <> "\n"
-    <> info
+  let info =
+    moss.new()
+    |> moss.border(moss.normal_border_glyphs(), subtle)
+    |> moss.border_sides(moss.BorderSides(True, False, False, False))
+    |> moss.render(info)
+  let description = "\nStyles and Layouts for Gleam Terminals\n" <> info
 
   string_width.stack_horizontal(
     [logo, description],
@@ -148,16 +160,17 @@ fn dialog(
   gradient_start: moss.Color,
 ) -> String {
   let question = "Try the Moss palette?"
-  let characters = string.to_graphemes(question)
-  let colors = blend(list.length(characters), gradient_start, highlight)
-  let question =
-    list.zip(characters, colors)
-    |> list.map(fn(pair) {
-      let #(character, color) = pair
-      moss.new() |> moss.foreground(color) |> moss.render(character)
+  let colors =
+    gradient.blend_1d(string.length(question), [gradient_start, highlight])
+  let spans =
+    list.index_map(colors, fn(color, index) {
+      ranges.Range(index, index + 1, moss.new() |> moss.foreground(color))
     })
-    |> string.concat
-    |> string_width.align(to: 50, align: string_width.Center, with: " ")
+  let question =
+    moss.new()
+    |> moss.width(50)
+    |> moss.align_horizontal(string_width.Center)
+    |> moss.render(ranges.render(question, spans))
 
   let button =
     moss.new()
@@ -180,28 +193,18 @@ fn dialog(
     |> moss.render(contents)
 
   let Size(rows, columns) = string_width.dimensions(panel)
-  let sides = moss_fill(subtle, { width - columns } / 2)
-  let full = moss_fill(subtle, width)
+  let side = { width - columns } / 2
   let top = { 9 - rows } / 2
-  let panel_rows =
-    string.split(panel, "\n") |> list.map(fn(row) { sides <> row <> sides })
-  list.flatten([
-    list.repeat(full, top),
-    panel_rows,
-    list.repeat(full, 9 - rows - top),
-  ])
-  |> string.join("\n")
-}
-
-fn moss_fill(style: moss.Style, columns: Int) -> String {
-  // Each character takes two cells. Fill the last odd cell with a space.
-  let remainder = case columns % 4 {
-    0 -> ""
-    1 -> " "
-    2 -> "青"
-    _ -> "青 "
-  }
-  moss.render(style, string.repeat("青苔", columns / 4) <> remainder)
+  moss.new()
+  |> moss.margin(
+    top: top,
+    right: width - columns - side,
+    bottom: 9 - rows - top,
+    left: side,
+  )
+  |> moss.margin_fill("青苔")
+  |> moss.margin_style(subtle)
+  |> moss.render(panel)
 }
 
 fn lists_and_grid(
@@ -239,12 +242,12 @@ fn lists_and_grid(
       completed,
     )
 
-  let left = blend(8, rgb(mint), rgb("#215740"))
-  let right = blend(8, rgb("#D9F99D"), rgb("#2DD4BF"))
+  let left = gradient.blend_1d(8, [rgb(mint), rgb("#215740")])
+  let right = gradient.blend_1d(8, [rgb("#D9F99D"), rgb("#2DD4BF")])
   let grid =
     list.zip(left, right)
     |> list.map(fn(pair) {
-      blend(14, pair.0, pair.1)
+      gradient.blend_1d(14, [pair.0, pair.1])
       |> list.map(fn(color) {
         moss.new() |> moss.background(color) |> moss.render("  ")
       })
@@ -274,22 +277,17 @@ fn list_column(
         #(False, text) -> "  " <> text
       }
     })
-  let divider =
-    moss.render(edge, string.repeat("─", string_width.line(heading)))
-  let side = moss.render(edge, "│")
-  [heading, divider, ..rows]
-  |> list.append([""])
-  |> list.map(fn(row) {
-    string_width.align(
-      row,
-      to: width / 3 - 1,
-      align: string_width.Left,
-      with: " ",
-    )
-    <> side
-    <> " "
-  })
-  |> string.join("\n")
+  let bordered = moss.new() |> moss.border(moss.normal_border_glyphs(), edge)
+  let heading =
+    bordered
+    |> moss.border_sides(moss.BorderSides(False, False, True, False))
+    |> moss.render(heading)
+  bordered
+  |> moss.border_sides(moss.BorderSides(False, True, False, False))
+  |> moss.width(width / 3)
+  |> moss.height(8)
+  |> moss.margin(top: 0, right: 1, bottom: 0, left: 0)
+  |> moss.render(string.join([heading, ..rows], "\n"))
 }
 
 fn notes() -> String {
@@ -297,6 +295,8 @@ fn notes() -> String {
     moss.new()
     |> moss.foreground(rgb("#E9FBF2"))
     |> moss.background(rgb("#174936"))
+    |> moss.width(history_width)
+    |> moss.height(19)
     |> moss.padding(top: 1, right: 2, bottom: 1, left: 2)
   let blocks =
     [
@@ -315,22 +315,9 @@ fn notes() -> String {
     ]
     |> list.map(fn(block) {
       let #(text, alignment) = block
-      let wrapped =
-        string_width.limit(
-          text,
-          to: Size(string.length(text), history_width - 4),
-          ellipsis: "",
-        )
-      let missing_rows = int.max(0, 17 - string_width.dimensions(wrapped).rows)
-      let padded = wrapped <> string.repeat("\n ", missing_rows)
-      let aligned =
-        string_width.align(
-          padded,
-          to: history_width - 4,
-          align: alignment,
-          with: " ",
-        )
-      moss.render(style, aligned)
+      style
+      |> moss.align_horizontal(alignment)
+      |> moss.render(text)
     })
 
   string_width.stack_horizontal(blocks, string_width.Top, gap: 3, with: " ")
@@ -351,62 +338,20 @@ fn status_bar(status: moss.Style, background_name: String) -> String {
   let brand = badge |> moss.background(rgb("#174936")) |> moss.render("🌿 Moss")
   let available = width - string_width.line(key <> encoding <> brand)
   let text = " " <> background_name <> " palette"
-  let value =
-    string_width.align(text, to: available, align: string_width.Left, with: " ")
-  key <> moss.render(status, value) <> encoding <> brand
+  let value = status |> moss.width(available) |> moss.render(text)
+  key <> value <> encoding <> brand
 }
 
-fn add_modal(page: String) -> String {
-  let modal =
-    moss.new()
-    |> moss.italic
-    |> moss.foreground(rgb("#102A22"))
-    |> moss.background(rgb(mint))
-    |> moss.padding(top: 1, right: 6, bottom: 1, left: 6)
-    |> moss.render("Moss in the foreground")
-  let size = string_width.dimensions(modal)
-  let rows = string.split(page, "\n")
-  let #(before, rest) = list.split(rows, at: modal_y)
-  let #(covered, after) = list.split(rest, at: size.rows)
-  let right = modal_x + size.columns
-  let overlaid =
-    list.zip(covered, string.split(modal, "\n"))
-    |> list.map(fn(pair) {
-      let #(row, overlay) = pair
-      slice_columns(row, 0, modal_x)
-      <> overlay
-      <> slice_columns(row, right, width + 4)
-    })
-  list.flatten([before, overlaid, after]) |> string.join("\n")
-}
-
-// Keep style resets and include only graphemes that fit entirely in the slice.
-fn slice_columns(row: String, left: Int, right: Int) -> String {
-  string_width.fold(row, from: "", with: fn(acc, piece) {
-    case
-      piece.width == 0
-      || { piece.column >= left && piece.column + piece.width <= right }
-    {
-      True -> acc <> piece.piece
-      False -> acc
-    }
-  })
+fn modal() -> String {
+  moss.new()
+  |> moss.italic
+  |> moss.foreground(rgb("#102A22"))
+  |> moss.background(rgb(mint))
+  |> moss.padding(top: 1, right: 6, bottom: 1, left: 6)
+  |> moss.render("Moss in the foreground")
 }
 
 fn rgb(hex: String) -> moss.Color {
   let assert Ok(color) = moss.hex(hex)
   color
-}
-
-fn blend(steps: Int, from: moss.Color, to: moss.Color) -> List(moss.Color) {
-  let assert moss.Color(r1, g1, b1) = from
-  let assert moss.Color(r2, g2, b2) = to
-  let intervals = steps - 1
-  int.range(0, steps, [], fn(colors, index) {
-    let mix = fn(a, b) {
-      { a * { intervals - index } + b * index + intervals / 2 } / intervals
-    }
-    [moss.Color(mix(r1, r2), mix(g1, g2), mix(b1, b2)), ..colors]
-  })
-  |> list.reverse
 }
