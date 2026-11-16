@@ -64,13 +64,14 @@ fn render_table(table: Table, columns: Int) -> String {
       |> list.map(fn(cell) { int.max(cell.0, string_width.line(cell.1)) })
     })
   let rule = fn(left, joint, right) {
-    left
-    <> string.join(
-      list.map(widths, fn(width) { string.repeat("─", width + 2) }),
-      joint,
-    )
-    <> right
-    |> moss.render(table.border_style, _)
+    let line =
+      left
+      <> string.join(
+        list.map(widths, fn(width) { string.repeat("─", width + 2) }),
+        joint,
+      )
+      <> right
+    moss.render(table.border_style, line)
   }
   let header_rows = case table.headers {
     [] -> []
