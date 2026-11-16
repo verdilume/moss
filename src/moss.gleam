@@ -5,6 +5,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleam_community/colour
+import moss/internal/ansi_style
 import string_width
 
 /// Named ANSI colors, indexed ANSI-256 colors, or true-color RGB.
@@ -34,6 +35,15 @@ pub type ColorError {
   InvalidHex
 }
 
+/// Underline shapes supported by terminals that implement extended SGR.
+pub type Underline {
+  SingleUnderline
+  DoubleUnderline
+  CurlyUnderline
+  DottedUnderline
+  DashedUnderline
+}
+
 /// An immutable style value that can be compared with `==`.
 pub opaque type Style {
   Style(
@@ -42,7 +52,9 @@ pub opaque type Style {
     bold: Bool,
     faint: Bool,
     italic: Bool,
-    underline: Bool,
+    underline: Option(Underline),
+    underline_color: Option(Color),
+    blink: Bool,
     reverse: Bool,
     strikethrough: Bool,
     hyperlink: Option(String),
@@ -58,12 +70,12 @@ type Box {
     height: Int,
     max_width: Int,
     max_height: Int,
-    horizontal: string_width.Alignment,
-    vertical: string_width.Placement,
+    horizontal: Option(string_width.Alignment),
+    vertical: Option(string_width.Placement),
     padding_fill: String,
     margin_fill: String,
     margin_style: Option(Style),
-    fill: String,
+    fill: Option(String),
     border: Option(BorderConfig),
   )
 }
@@ -116,12 +128,12 @@ fn default_box() -> Box {
     height: 0,
     max_width: 0,
     max_height: 0,
-    horizontal: string_width.Left,
-    vertical: string_width.Top,
+    horizontal: None,
+    vertical: None,
     padding_fill: " ",
     margin_fill: " ",
     margin_style: None,
-    fill: " ",
+    fill: None,
     border: None,
   )
 }
@@ -134,12 +146,54 @@ pub fn new() -> Style {
     bold: False,
     faint: False,
     italic: False,
-    underline: False,
+    underline: None,
+    underline_color: None,
+    blink: False,
     reverse: False,
     strikethrough: False,
     hyperlink: None,
     box: default_box(),
   )
+}
+
+/// Fill unset span and box properties from a fallback style. Padding and
+/// margins stay local to the receiving style.
+pub fn inherit(style: Style, fallback: Style) -> Style {
+  Style(
+    foreground: option.or(style.foreground, fallback.foreground),
+    background: option.or(style.background, fallback.background),
+    bold: style.bold || fallback.bold,
+    faint: style.faint || fallback.faint,
+    italic: style.italic || fallback.italic,
+    underline: option.or(style.underline, fallback.underline),
+    underline_color: option.or(style.underline_color, fallback.underline_color),
+    blink: style.blink || fallback.blink,
+    reverse: style.reverse || fallback.reverse,
+    strikethrough: style.strikethrough || fallback.strikethrough,
+    hyperlink: option.or(style.hyperlink, fallback.hyperlink),
+    box: inherit_box(style.box, fallback.box),
+  )
+}
+
+fn inherit_box(box: Box, fallback: Box) -> Box {
+  Box(
+    ..box,
+    width: inherit_dimension(box.width, fallback.width),
+    height: inherit_dimension(box.height, fallback.height),
+    max_width: inherit_dimension(box.max_width, fallback.max_width),
+    max_height: inherit_dimension(box.max_height, fallback.max_height),
+    horizontal: option.or(box.horizontal, fallback.horizontal),
+    vertical: option.or(box.vertical, fallback.vertical),
+    fill: option.or(box.fill, fallback.fill),
+    border: option.or(box.border, fallback.border),
+  )
+}
+
+fn inherit_dimension(value: Int, fallback: Int) -> Int {
+  case value {
+    0 -> fallback
+    _ -> value
+  }
 }
 
 /// Set the text color.
@@ -192,14 +246,39 @@ pub fn unset_italic(style: Style) -> Style {
   Style(..style, italic: False)
 }
 
-/// Enable underlined text.
+/// Enable a single underline.
 pub fn underline(style: Style) -> Style {
-  Style(..style, underline: True)
+  underline_style(style, SingleUnderline)
+}
+
+/// Set the underline shape. Terminal support varies for extended underlines.
+pub fn underline_style(style: Style, shape: Underline) -> Style {
+  Style(..style, underline: Some(shape))
 }
 
 /// Disable underlined text.
 pub fn unset_underline(style: Style) -> Style {
-  Style(..style, underline: False)
+  Style(..style, underline: None)
+}
+
+/// Set the underline color. This can be combined with any underline shape.
+pub fn underline_color(style: Style, color: Color) -> Style {
+  Style(..style, underline_color: Some(color))
+}
+
+/// Clear the underline color.
+pub fn unset_underline_color(style: Style) -> Style {
+  Style(..style, underline_color: None)
+}
+
+/// Enable blinking text in terminals that support it.
+pub fn blink(style: Style) -> Style {
+  Style(..style, blink: True)
+}
+
+/// Disable blinking text.
+pub fn unset_blink(style: Style) -> Style {
+  Style(..style, blink: False)
 }
 
 /// Enable reverse video, swapping the displayed foreground and background.
@@ -283,7 +362,7 @@ pub fn align_horizontal(
   style: Style,
   alignment: string_width.Alignment,
 ) -> Style {
-  Style(..style, box: Box(..style.box, horizontal: alignment))
+  Style(..style, box: Box(..style.box, horizontal: Some(alignment)))
 }
 
 /// Place the content and its padding within the requested box height.
@@ -291,7 +370,7 @@ pub fn align_vertical(
   style: Style,
   alignment: string_width.Placement,
 ) -> Style {
-  Style(..style, box: Box(..style.box, vertical: alignment))
+  Style(..style, box: Box(..style.box, vertical: Some(alignment)))
 }
 
 /// Set unstyled space outside the border. Negative values become zero.
@@ -328,7 +407,7 @@ pub fn margin_style(style: Style, margin_style: Style) -> Style {
 
 /// Repeat a pattern in the space created when sizing or aligning content.
 pub fn fill(style: Style, pattern: String) -> Style {
-  Style(..style, box: Box(..style.box, fill: box_pattern(pattern)))
+  Style(..style, box: Box(..style.box, fill: Some(box_pattern(pattern))))
 }
 
 fn insets(top: Int, right: Int, bottom: Int, left: Int) -> Insets {
@@ -526,7 +605,11 @@ fn render_box(style: Style, text: String) -> String {
       0,
       box.width - padding.left - padding.right - edges.left - edges.right,
     )
-  let text = text |> string.replace("\r\n", "\n") |> string_width.tabs_to_spaces
+  let text =
+    text
+    |> ansi_style.normalize
+    |> string.replace("\r\n", "\n")
+    |> string_width.tabs_to_spaces
   let text = case
     box.width > 0 && string_width.line(text) > int.max(1, target_width)
   {
@@ -558,19 +641,21 @@ fn render_box(style: Style, text: String) -> String {
   let right_pad = fill_columns(box.padding_fill, padding.right)
   let padding_row = fill_columns(box.padding_fill, inner_width)
 
+  let fill = option.unwrap(box.fill, " ")
+  let horizontal = option.unwrap(box.horizontal, string_width.Left)
   let content =
     list.map(lines, fn(line) {
       let #(text, columns) = line
       let missing = content_width - columns
-      let before = case box.horizontal {
+      let before = case horizontal {
         string_width.Left -> 0
         string_width.Center -> missing / 2
         string_width.Right -> missing
       }
       left_pad
-      <> fill_columns(box.fill, before)
+      <> fill_columns(fill, before)
       <> text
-      <> fill_columns(box.fill, missing - before)
+      <> fill_columns(fill, missing - before)
       <> right_pad
     })
 
@@ -584,12 +669,12 @@ fn render_box(style: Style, text: String) -> String {
         - padding.bottom
         - list.length(lines),
     )
-  let above = case box.vertical {
+  let above = case option.unwrap(box.vertical, string_width.Top) {
     string_width.Top -> 0
     string_width.Middle -> missing_rows / 2
     string_width.Bottom -> missing_rows
   }
-  let fill_row = fill_columns(box.fill, inner_width)
+  let fill_row = fill_columns(fill, inner_width)
   let rows =
     list.flatten([
       list.repeat(fill_row, above),
@@ -608,6 +693,7 @@ fn render_box(style: Style, text: String) -> String {
     Insets(0, 0, 0, 0) -> rows
     _ -> render_margin(box, rows, inner_width + edges.left + edges.right)
   }
+  let cropped_height = box.max_height > 0 && box.max_height < list.length(rows)
   let rows = case box.max_height {
     0 -> rows
     cap -> list.take(rows, cap)
@@ -616,7 +702,21 @@ fn render_box(style: Style, text: String) -> String {
     0 -> rows
     cap -> list.map(rows, fn(row) { take_columns(row, cap).0 })
   }
-  string.join(rows, "\n")
+  let rendered = string.join(rows, "\n")
+  case cropped_height {
+    False -> rendered
+    True -> {
+      let empty = ansi_style.empty()
+      let style =
+        string_width.fold_raw(
+          rendered,
+          string_width.new(),
+          from: empty,
+          with: fn(style, piece, _) { ansi_style.apply(style, piece) },
+        )
+      rendered <> ansi_style.transition(style, empty)
+    }
+  }
 }
 
 fn render_margin(box: Box, rows: List(String), width: Int) -> List(String) {
@@ -862,12 +962,21 @@ fn render_span(style: Style, text: String) -> String {
 }
 
 fn build_codes(style: Style) -> List(String) {
+  let underline = case style.underline {
+    None -> ""
+    Some(SingleUnderline) -> "4"
+    Some(DoubleUnderline) -> "4:2"
+    Some(CurlyUnderline) -> "4:3"
+    Some(DottedUnderline) -> "4:4"
+    Some(DashedUnderline) -> "4:5"
+  }
   let attrs =
     [
       #(style.bold, "1"),
       #(style.faint, "2"),
       #(style.italic, "3"),
-      #(style.underline, "4"),
+      #(underline != "", underline),
+      #(style.blink, "5"),
       #(style.reverse, "7"),
       #(style.strikethrough, "9"),
     ]
@@ -878,50 +987,44 @@ fn build_codes(style: Style) -> List(String) {
       }
     })
 
-  let fg = case style.foreground {
-    Some(color) -> [color_to_code(color, True)]
-    None -> []
-  }
-
-  let bg = case style.background {
-    Some(color) -> [color_to_code(color, False)]
-    None -> []
-  }
-
-  list.flatten([attrs, fg, bg])
+  let colors =
+    [
+      #(style.foreground, 38),
+      #(style.background, 48),
+      #(style.underline_color, 58),
+    ]
+    |> list.filter_map(fn(channel) {
+      case channel.0 {
+        Some(color) -> Ok(color_to_code(color, channel.1))
+        None -> Error(Nil)
+      }
+    })
+  list.append(attrs, colors)
 }
 
-fn color_to_code(color: Color, is_fg: Bool) -> String {
-  let offset = case is_fg {
-    True -> 0
-    False -> 10
-  }
-
+fn color_to_code(color: Color, base: Int) -> String {
   case color {
-    Black -> int.to_string(30 + offset)
-    Red -> int.to_string(31 + offset)
-    Green -> int.to_string(32 + offset)
-    Yellow -> int.to_string(33 + offset)
-    Blue -> int.to_string(34 + offset)
-    Magenta -> int.to_string(35 + offset)
-    Cyan -> int.to_string(36 + offset)
-    White -> int.to_string(37 + offset)
-    BrightBlack -> int.to_string(90 + offset)
-    BrightRed -> int.to_string(91 + offset)
-    BrightGreen -> int.to_string(92 + offset)
-    BrightYellow -> int.to_string(93 + offset)
-    BrightBlue -> int.to_string(94 + offset)
-    BrightMagenta -> int.to_string(95 + offset)
-    BrightCyan -> int.to_string(96 + offset)
-    BrightWhite -> int.to_string(97 + offset)
-    Indexed(index) ->
-      int.to_string(38 + offset)
-      <> ";5;"
-      <> int.to_string(int.clamp(index, 0, 255))
+    Black -> basic_color_to_code(0, base)
+    Red -> basic_color_to_code(1, base)
+    Green -> basic_color_to_code(2, base)
+    Yellow -> basic_color_to_code(3, base)
+    Blue -> basic_color_to_code(4, base)
+    Magenta -> basic_color_to_code(5, base)
+    Cyan -> basic_color_to_code(6, base)
+    White -> basic_color_to_code(7, base)
+    BrightBlack -> basic_color_to_code(8, base)
+    BrightRed -> basic_color_to_code(9, base)
+    BrightGreen -> basic_color_to_code(10, base)
+    BrightYellow -> basic_color_to_code(11, base)
+    BrightBlue -> basic_color_to_code(12, base)
+    BrightMagenta -> basic_color_to_code(13, base)
+    BrightCyan -> basic_color_to_code(14, base)
+    BrightWhite -> basic_color_to_code(15, base)
+    Indexed(index) -> indexed_color_to_code(index, base)
     Color(red, green, blue) ->
       string.join(
         [
-          int.to_string(38 + offset),
+          int.to_string(base),
           "2",
           int.to_string(int.clamp(red, 0, 255)),
           int.to_string(int.clamp(green, 0, 255)),
@@ -930,6 +1033,18 @@ fn color_to_code(color: Color, is_fg: Bool) -> String {
         ";",
       )
   }
+}
+
+fn basic_color_to_code(index: Int, base: Int) -> String {
+  case base, index < 8 {
+    58, _ -> indexed_color_to_code(index, base)
+    _, True -> int.to_string(base - 8 + index)
+    _, False -> int.to_string(base + 44 + index)
+  }
+}
+
+fn indexed_color_to_code(index: Int, base: Int) -> String {
+  int.to_string(base) <> ";5;" <> int.to_string(int.clamp(index, 0, 255))
 }
 
 /// Parse six hex digits, with an optional leading `#`.
