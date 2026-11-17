@@ -1,4 +1,4 @@
-# Moss
+![Moss Banner](mossbanner.png)
 
 Moss renders ANSI-styled text and boxes for Gleam. A style is an immutable value.
 Each setter returns a new style, so setters compose in a pipeline.
